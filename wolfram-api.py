@@ -64,4 +64,7 @@ if __name__ == "__main__":
             print("not valid theme! avaliable themes: light, dark")
             from sys import exit
             exit(1)
+    if not args.timeout:
+        args.timeout = 2
     results = asyncio.run(wolfram_api().natural_language(args.question, args.theme, args.timeout))
+    print(json.dumps(results, indent=4))
