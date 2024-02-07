@@ -8,6 +8,10 @@ from typing import Literal
 
 class wolfram_api:
 
+    class invalid_input(Exception):
+        def __init__(self, *args: object) -> None:
+            super().__init__(*args)
+
     class api_error(Exception):
         def __init__(self, *args: object) -> None:
             super().__init__(*args)
@@ -38,6 +42,8 @@ class wolfram_api:
     async def parse_responses(self):
         index = 0
         for i in self.responses:
+            if i.get('type') and i.get('type') == 'noResult':
+                raise self.invalid_input(f"Invalid input!: {i.get('input')}")
             if i.get("pods"):
                 for j in i["pods"]:
                     if j.get("subpods"):
