@@ -1,5 +1,5 @@
 import asyncio
-import websockets
+import aiohttp
 import json
 import os
 from datetime import datetime
@@ -16,11 +16,14 @@ class wolfram_api:
         def __init__(self, *args: object) -> None:
             super().__init__(*args)
 
-    async def natural_language(self, question: str, theme: Literal['light', 'dark'] = 'dark', timeout: int = 2):
+    async def natural_language(self, question: str, theme: Literal['light', 'dark'] = 'dark'):
         self.query = {"type":"newQuery","locationId":"gu311","language":"en","displayDebuggingInfo":False,"yellowIsError":False,"requestSidebarAd":True,"category":"results","input":question,"i2d":False,"assumption":[],"apiParams":{},"file":None,"theme":theme}
-        self.timeout = timeout
         self.responses = []
-        await self.send_request()
+        self.question = question
+        async with aiohttp.ClientSession() as session:
+            if not hasattr(self, "session") or self.session.closed:
+                self.session = session
+            await self.send_request()
         if not self.responses:
             raise self.api_error("Error with API! Perhaps sent same question too many times? Or too short timeout")
         self.timestamp = str(int(datetime.now().timestamp()))
@@ -30,20 +33,18 @@ class wolfram_api:
     
     async def send_request(self):
         uri = "wss://www.wolframalpha.com/n/v1/api/fetcher/results"
-        async with websockets.connect(uri) as websocket:
-            await websocket.send(json.dumps(self.query))
-            try:
-                while True:
-                    response = await asyncio.wait_for(websocket.recv(), self.timeout)
-                    self.responses.append(json.loads(response))
-            except asyncio.TimeoutError:
-                return
+        async with self.session.ws_connect(uri) as websocket:
+            await websocket.send_json(self.query)
+            async for response in websocket:
+                if response.json()['type'] == 'queryComplete':
+                    break
+                self.responses.append(response.json())
 
     async def parse_responses(self):
         index = 0
         for i in self.responses:
-            if i.get('type') and i.get('type') == 'noResult':
-                raise self.invalid_input(f"Invalid input!: {i.get('input')}")
+            if i.get('type') and i.get('type') == 'noResult' or i.get('type') == 'didyoumean':
+                raise self.invalid_input(f"Invalid input!: {self.question}")
             if i.get("pods"):
                 for j in i["pods"]:
                     if j.get("subpods"):
@@ -63,14 +64,12 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("question", type=str, help="mathematical equation using natural syntax")
     parser.add_argument("--theme", "-th", type=str, help="what theme to use for images - light, dark")
-    parser.add_argument("--timeout", "-t", type=int, help="how long to wait for an answer from wolfram (the harder the question the longer you should set the timeout)")
     args = parser.parse_args()
     if args.theme:
         if args.theme not in ['light', 'dark']:
             print("not valid theme! avaliable themes: light, dark")
             from sys import exit
             exit(1)
-    if not args.timeout:
-        args.timeout = 2
-    results = asyncio.run(wolfram_api().natural_language(args.question, args.theme, args.timeout))
+
+    results = asyncio.run(wolfram_api().natural_language(args.question, args.theme))
     print(json.dumps(results, indent=4))
