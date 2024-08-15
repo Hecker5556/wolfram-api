@@ -45,6 +45,7 @@ class wolfram_api:
         for i in self.responses:
             if i.get('type') and i.get('type') == 'noResult' or i.get('type') == 'didyoumean':
                 raise self.invalid_input(f"Invalid input!: {self.question}")
+            clear = lambda x: "".join([i for i in x if i not in "\\/:*?<>|()"])
             if i.get("pods"):
                 for j in i["pods"]:
                     if j.get("subpods"):
@@ -52,9 +53,10 @@ class wolfram_api:
                             if k.get('img'):
                                 if not os.path.exists("wolfram_pics"):
                                     os.mkdir("wolfram_pics")
-                                with open(f"wolfram_pics/image-{self.timestamp}-{index}-{j.get('id')}.{k['img'].get('contenttype').split('/')[1]}", 'wb') as f1:
+                                filename = f"wolfram_pics/image-{self.timestamp}-{index}-{clear(j.get('id'))}.{k['img'].get('contenttype').split('/')[1]}"
+                                with open(filename, 'wb') as f1:
                                     f1.write(base64.b64decode(k['img']['data']))
-                                self.results['filenames'].append(f"wolfram_pics/image-{self.timestamp}-{index}-{j.get('id')}.{k['img'].get('contenttype').split('/')[1]}")
+                                self.results['filenames'].append(filename)
                                 if k['img'].get('title'):
                                     self.results[j.get('id') + '-' +  str(index)] = k['img']['title']
                                 index += 1
