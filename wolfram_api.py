@@ -32,7 +32,7 @@ class wolfram_api:
         return self.results
     
     async def send_request(self):
-        uri = "wss://www.wolframalpha.com/n/v1/api/fetcher/results"
+        uri = "wss://gateway.wolframalpha.com/gateway"
         async with self.session.ws_connect(uri) as websocket:
             await websocket.send_json(self.query)
             async for response in websocket:
@@ -59,6 +59,9 @@ class wolfram_api:
                                 self.results['filenames'].append(filename)
                                 if k['img'].get('title'):
                                     self.results[j.get('id') + '-' +  str(index)] = k['img']['title']
+                                index += 1
+                            else:
+                                self.results[j.get('title') + '-' +  str(index)] = k.get('plaintext')
                                 index += 1
 
 if __name__ == "__main__":
